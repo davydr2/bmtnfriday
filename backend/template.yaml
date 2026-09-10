@@ -15,18 +15,6 @@ Globals:
       - !Ref DepsLayer
 
 Parameters:
-  # Microsoft Entra ID (Azure AD) — from your Azure App Registration
-  MicrosoftClientId:
-    Type: String
-    Description: Azure App Registration client ID
-  MicrosoftClientSecret:
-    Type: String
-    NoEcho: true
-    Description: Azure App Registration client secret
-  MicrosoftTenantId:
-    Type: String
-    Description: Azure AD tenant ID (your VSO tenant)
-  # Slack (Phase 2 — leave blank for now)
   SlackBotToken:
     Type: String
     Default: ''
@@ -56,22 +44,6 @@ Resources:
       UserPoolTags:
         Project: bmtnfriday
 
-  MicrosoftIdP:
-    Type: AWS::Cognito::UserPoolIdentityProvider
-    Properties:
-      UserPoolId: !Ref UserPool
-      ProviderName: Microsoft
-      ProviderType: OIDC
-      ProviderDetails:
-        client_id: !Ref MicrosoftClientId
-        client_secret: !Ref MicrosoftClientSecret
-        attributes_request_method: GET
-        oidc_issuer: !Sub 'https://login.microsoftonline.com/${MicrosoftTenantId}/v2.0'
-        authorize_scopes: 'openid email profile'
-      AttributeMapping:
-        email: email
-        name: name
-        username: sub
 
   UserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
@@ -88,7 +60,6 @@ Resources:
 
   UserPoolClient:
     Type: AWS::Cognito::UserPoolClient
-    DependsOn: MicrosoftIdP
     Properties:
       ClientName: bmtnfriday-web
       UserPoolId: !Ref UserPool
@@ -97,7 +68,7 @@ Resources:
       AllowedOAuthScopes: [openid, email, profile]
       AllowedOAuthFlowsUserPoolClient: true
       SupportedIdentityProviders:
-        - Microsoft
+        - COGNITO
       CallbackURLs:
         - https://bmtnfriday.com/
         - http://localhost:5173/
