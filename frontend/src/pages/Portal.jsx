@@ -136,6 +136,7 @@ export default function Portal() {
       </div>
 
       <NagBanner cycleId={cycle.id} onClaimed={load} />
+      <PtoBonus cycleId={cycle.id} />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card label="Submitted" value={`${submitted} / ${eligible}`} />
@@ -167,6 +168,50 @@ export default function Portal() {
         </p>
         <p className="text-xs text-gray-400 mt-1">100% by 8 PM = $30 base · by 7 PM = $35 base</p>
       </div>
+    </div>
+  )
+}
+
+function PtoBonus({ cycleId }) {
+  const [claiming, setClaiming] = useState(false)
+  const [claimed, setClaimed] = useState(false)
+  const [error, setError] = useState('')
+
+  async function claim() {
+    setClaiming(true)
+    setError('')
+    try {
+      await api.post(`/cycles/${cycleId}/pto`)
+      setClaimed(true)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setClaiming(false)
+    }
+  }
+
+  if (claimed) {
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-6 text-sm text-blue-700 font-medium">
+        +2 PTO tokens added for this week.
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 mb-6 flex items-center justify-between">
+      <div>
+        <p className="text-sm font-medium text-gray-800">Taking 3+ days off this week?</p>
+        <p className="text-xs text-gray-400">Claim your PTO bonus — +2 tokens, once per week</p>
+        {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      </div>
+      <button
+        onClick={claim}
+        disabled={claiming}
+        className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-1.5 rounded-lg cursor-pointer disabled:opacity-60 shrink-0 ml-4"
+      >
+        {claiming ? 'Claiming…' : 'Claim PTO Bonus'}
+      </button>
     </div>
   )
 }

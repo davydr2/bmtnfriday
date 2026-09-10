@@ -326,6 +326,23 @@ Resources:
             Path: /cycles/{id}/nag/claim
             Method: POST
 
+  # PTO bonus
+  ClaimPtoBonusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/pto/
+      Handler: claim.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Table
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /cycles/{id}/pto
+            Method: POST
+
   # Weekly pool calculator (EventBridge — runs Fri 9 PM ET)
   WeeklyPoolFunction:
     Type: AWS::Serverless::Function
