@@ -15,12 +15,11 @@ Globals:
       - !Ref DepsLayer
 
 Parameters:
-  SlackBotToken:
+  SlackWebhookUrl:
     Type: String
     Default: ''
-  SlackChannelId:
-    Type: String
-    Default: ''
+    NoEcho: true
+    Description: Slack workflow webhook URL — posts NAG IS LIVE to the channel
 
 Resources:
 
@@ -289,6 +288,27 @@ Resources:
             Auth:
               Authorizer: NONE
 
+  # IAM role for EventBridge Scheduler to invoke NagFireFunction
+  SchedulerInvokeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: bmtnfriday-scheduler-invoke-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeNagFire
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt NagFireFunction.Arn
+
   # Nag
   NagStatusFunction:
     Type: AWS::Serverless::Function
@@ -311,10 +331,6 @@ Resources:
     Properties:
       CodeUri: functions/nag/
       Handler: claim.handler
-      Environment:
-        Variables:
-          SLACK_BOT_TOKEN: !Ref SlackBotToken
-          SLACK_CHANNEL_ID: !Ref SlackChannelId
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref Table
@@ -358,20 +374,45 @@ Resources:
           Properties:
             Schedule: cron(0 2 ? * SAT *)  # 9 PM ET = 2 AM UTC Saturday
 
-  # Nag window opener (EventBridge — Fri 3:00–3:30 PM ET)
-  NagWindowFunction:
+  # Fires at 3 PM ET every Friday — picks random offset, schedules NagFireFunction
+  NagSchedulerFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: functions/nag/
-      Handler: open.handler
+      Handler: schedule.handler
+      Environment:
+        Variables:
+          NAG_FIRE_FUNCTION_ARN: !GetAtt NagFireFunction.Arn
+          SCHEDULER_ROLE_ARN: !GetAtt SchedulerInvokeRole.Arn
       Policies:
-        - DynamoDBCrudPolicy:
+        - DynamoDBReadPolicy:
             TableName: !Ref Table
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action: scheduler:CreateSchedule
+              Resource: !Sub 'arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/default/bmtnfriday-nag-*'
+            - Effect: Allow
+              Action: iam:PassRole
+              Resource: !GetAtt SchedulerInvokeRole.Arn
       Events:
         FridayNag:
           Type: Schedule
           Properties:
-            Schedule: cron(0 20 ? * FRI *)  # 3 PM ET = 8 PM UTC
+            Schedule: cron(0 20 ? * FRI *)  # 3 PM ET = 8 PM UTC (EDT)
+
+  # Invoked at random time 3:00–3:30 PM ET — opens nag in DB and yells in Slack
+  NagFireFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/nag/
+      Handler: fire.handler
+      Environment:
+        Variables:
+          SLACK_WEBHOOK_URL: !Ref SlackWebhookUrl
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Table
 
   # ── S3 + CloudFront ───────────────────────────────────────────────────────
   WebBucket:

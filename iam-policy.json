@@ -69,6 +69,8 @@
         "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-SubmitReportFunction-fKflM8ERYtuc",
         "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-UpsertEmployeeFunction-IdqFDC64cYhs",
         "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-ClaimPtoBonusFunction-*",
+        "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-NagSchedulerFunction-*",
+        "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-NagFireFunction-*",
         "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-WeeklyPoolFunction-6JVW3yPWlrxp",
         "arn:aws:lambda:us-east-1:481652369848:layer:bmtnfriday-deps:*"
       ]
@@ -127,6 +129,17 @@
         "apigateway:PATCH"
       ],
       "Resource": "arn:aws:apigateway:us-east-1::/restapis/5dxx2v6wl8/*"
+    },
+    {
+      "Sid": "EventBridgeScheduler",
+      "Effect": "Allow",
+      "Action": [
+        "scheduler:CreateSchedule",
+        "scheduler:DeleteSchedule",
+        "scheduler:GetSchedule",
+        "scheduler:ListSchedules"
+      ],
+      "Resource": "arn:aws:scheduler:us-east-1:481652369848:schedule/default/bmtnfriday-nag-*"
     },
     {
       "Sid": "EventBridge",

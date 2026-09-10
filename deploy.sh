@@ -19,11 +19,7 @@ sam deploy \
   --capabilities CAPABILITY_IAM \
   --no-confirm-changeset \
   --parameter-overrides \
-    MicrosoftClientId="$MICROSOFT_CLIENT_ID" \
-    MicrosoftClientSecret="$MICROSOFT_CLIENT_SECRET" \
-    MicrosoftTenantId="$MICROSOFT_TENANT_ID" \
-    SlackBotToken="${SLACK_BOT_TOKEN:-}" \
-    SlackChannelId="${SLACK_CHANNEL_ID:-}"
+    SlackWebhookUrl="${SLACK_WEBHOOK_URL:-}"
 
 # Capture stack outputs
 get_output() {
