@@ -78,34 +78,108 @@ function NagBanner({ cycleId, onClaimed }) {
   )
 }
 
-function PtoBonus({ cycleId }) {
+function weekLabel(startsAt, n) {
+  const start = new Date(startsAt)
+  const weekStart = new Date(start.getTime() + (n - 1) * 7 * 24 * 60 * 60 * 1000)
+  const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000)
+  const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return `${fmt(weekStart)} – ${fmt(weekEnd)}`
+}
+
+function PtoBonus({ cycleId, cycleStartsAt }) {
+  const [claimedWeeks, setClaimedWeeks] = useState(null)
+  const [selectedWeeks, setSelectedWeeks] = useState([])
+  const [brag, setBrag] = useState('')
   const [claiming, setClaiming] = useState(false)
-  const [claimed, setClaimed] = useState(false)
+  const [result, setResult] = useState(null)
   const [error, setError] = useState('')
 
-  async function claim() {
-    setClaiming(true); setError('')
-    try { await api.post(`/cycles/${cycleId}/pto`); setClaimed(true) }
-    catch (e) { setError(e.message) }
-    finally { setClaiming(false) }
+  useEffect(() => {
+    api.get(`/cycles/${cycleId}/pto`)
+      .then(data => setClaimedWeeks(data.claimed_weeks || []))
+      .catch(() => setClaimedWeeks([]))
+  }, [cycleId])
+
+  function toggleWeek(n) {
+    setSelectedWeeks(prev => prev.includes(n) ? prev.filter(w => w !== n) : [...prev, n])
   }
 
-  if (claimed) return (
-    <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4 text-sm text-blue-700 font-medium">
-      +2 PTO tokens added for this week.
-    </div>
-  )
+  async function claim() {
+    if (!selectedWeeks.length) return
+    setClaiming(true); setError('')
+    try {
+      const data = await api.post(`/cycles/${cycleId}/pto`, {
+        weeks: selectedWeeks,
+        brag: brag.trim() || undefined,
+      })
+      setResult(data)
+      setClaimedWeeks(prev => [...(prev || []), ...data.weeks_claimed])
+      setSelectedWeeks([])
+      setBrag('')
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setClaiming(false)
+    }
+  }
+
+  if (claimedWeeks === null) return null
+
+  const availableWeeks = [1, 2, 3, 4].filter(w => !claimedWeeks.includes(w))
+
   return (
-    <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
-      <div>
-        <p className="text-sm font-medium text-gray-800">Taking 3+ days off this week?</p>
-        <p className="text-xs text-gray-400">+2 tokens · once per week</p>
-        {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+    <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 mb-4">
+      <p className="text-sm font-medium text-gray-800 mb-1">Taking 3+ days off? Claim +2 tokens per week.</p>
+
+      {result && (
+        <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-2">
+          +{result.tokens_earned} tokens added
+          {result.weeks_already_claimed.length > 0 && ` · Week${result.weeks_already_claimed.length > 1 ? 's' : ''} ${result.weeks_already_claimed.join(', ')} already claimed`}
+        </div>
+      )}
+
+      <div className="space-y-1 mb-2">
+        {[1, 2, 3, 4].map(n => {
+          const isClaimed = claimedWeeks.includes(n)
+          const isSelected = selectedWeeks.includes(n)
+          return (
+            <label key={n} className={`flex items-center gap-2 text-sm cursor-pointer ${isClaimed ? 'opacity-40 cursor-default' : ''}`}>
+              <input
+                type="checkbox"
+                disabled={isClaimed}
+                checked={isSelected || isClaimed}
+                onChange={() => !isClaimed && toggleWeek(n)}
+                className="accent-blue-600"
+              />
+              <span className="text-gray-700">Week {n}</span>
+              <span className="text-gray-400 text-xs">{weekLabel(cycleStartsAt, n)}</span>
+              {isClaimed && <span className="text-green-600 text-xs font-medium">✓ claimed</span>}
+            </label>
+          )
+        })}
       </div>
-      <button onClick={claim} disabled={claiming}
-        className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-1.5 rounded-lg cursor-pointer disabled:opacity-60 shrink-0 ml-4">
-        {claiming ? 'Claiming…' : 'Claim PTO Bonus'}
-      </button>
+
+      {selectedWeeks.length > 0 && (
+        <textarea
+          value={brag}
+          onChange={e => setBrag(e.target.value)}
+          maxLength={200}
+          rows={2}
+          placeholder="Where are you off to? (optional brag)"
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mb-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+      )}
+
+      {error && <p className="text-xs text-red-500 mb-2">{error}</p>}
+
+      {availableWeeks.length > 0 && (
+        <button
+          onClick={claim}
+          disabled={claiming || !selectedWeeks.length}
+          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-1.5 rounded-lg cursor-pointer disabled:opacity-50 disabled:cursor-default">
+          {claiming ? 'Claiming…' : selectedWeeks.length ? `Claim ${selectedWeeks.length * 2} tokens` : 'Select weeks above'}
+        </button>
+      )}
     </div>
   )
 }
@@ -128,7 +202,7 @@ function FridayPortal({ status, onRefresh }) {
       </div>
 
       <NagBanner cycleId={cycle.id} onClaimed={onRefresh} />
-      <PtoBonus cycleId={cycle.id} />
+      <PtoBonus cycleId={cycle.id} cycleStartsAt={cycle.starts_at} />
 
       {/* Live submission counter */}
       <div className="bg-indigo-600 rounded-2xl p-6 text-white text-center mb-4">
@@ -190,7 +264,7 @@ function NormalPortal({ status, onRefresh }) {
       </div>
 
       <NagBanner cycleId={cycle.id} onClaimed={onRefresh} />
-      <PtoBonus cycleId={cycle.id} />
+      <PtoBonus cycleId={cycle.id} cycleStartsAt={cycle.starts_at} />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard label="Submitted" value={`${submitted} / ${eligible}`} />

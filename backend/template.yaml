@@ -343,6 +343,22 @@ Resources:
             Method: POST
 
   # PTO bonus
+  GetPtoStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/pto/
+      Handler: get.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref Table
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /cycles/{id}/pto
+            Method: GET
+
   ClaimPtoBonusFunction:
     Type: AWS::Serverless::Function
     Properties:
