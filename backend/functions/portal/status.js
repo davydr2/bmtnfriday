@@ -1,4 +1,4 @@
-const { ddb, TABLE, QueryCommand, GetCommand } = require('/opt/nodejs/db');
+const { ddb, TABLE, QueryCommand } = require('/opt/nodejs/db');
 const { ok, err } = require('/opt/nodejs/response');
 
 function weeklyPool(eligible, submitted, completedBy7pm = false, completedBy8pm = false) {
@@ -7,52 +7,78 @@ function weeklyPool(eligible, submitted, completedBy7pm = false, completedBy8pm 
   return Math.round(base * (submitted / eligible) * 100) / 100;
 }
 
+async function getCyclePool(cycleId) {
+  const weeksRes = await ddb.send(new QueryCommand({
+    TableName: TABLE,
+    KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
+    ExpressionAttributeValues: { ':pk': `CYCLE#${cycleId}`, ':sk': 'WEEK#' },
+  }));
+  return (weeksRes.Items || []).reduce((sum, w) => sum + (w.pool_amount || 0), 0);
+}
+
+async function getCycleSubmissionCount(cycleId) {
+  const res = await ddb.send(new QueryCommand({
+    TableName: TABLE,
+    IndexName: 'GSI1',
+    KeyConditionExpression: 'GSI1PK = :pk',
+    ExpressionAttributeValues: { ':pk': `CYCLE#${cycleId}#SUBMISSIONS` },
+    Select: 'COUNT',
+  }));
+  return res.Count || 0;
+}
+
 exports.handler = async () => {
   try {
-    // Find the active cycle
-    const cyclesRes = await ddb.send(new QueryCommand({
+    // Load all cycles, sorted by start date descending
+    const allCycles = await ddb.send(new QueryCommand({
       TableName: TABLE,
       IndexName: 'GSI1',
       KeyConditionExpression: 'GSI1PK = :type',
-      FilterExpression: '#status = :active',
-      ExpressionAttributeNames: { '#status': 'status' },
-      ExpressionAttributeValues: { ':type': 'CYCLE', ':active': 'active' },
+      ExpressionAttributeValues: { ':type': 'CYCLE' },
+      ScanIndexForward: false,
     }));
 
-    if (!cyclesRes.Items?.length) {
-      return ok({ active: false });
+    const cycles = allCycles.Items || [];
+    const activeCycle = cycles.find(c => c.status === 'active');
+    const closedCycles = cycles.filter(c => c.status === 'closed');
+    const prevCycle = closedCycles[0] || null;
+
+    // Previous cycle stats
+    let previous_cycle = null;
+    if (prevCycle) {
+      const [prevSubmitted, prevPool] = await Promise.all([
+        getCycleSubmissionCount(prevCycle.id),
+        getCyclePool(prevCycle.id),
+      ]);
+      const prevParticipation = prevCycle.eligible_count > 0
+        ? Math.round(prevSubmitted / prevCycle.eligible_count * 1000) / 10
+        : 0;
+      previous_cycle = {
+        id: prevCycle.id,
+        name: prevCycle.name,
+        starts_at: prevCycle.starts_at,
+        ends_at: prevCycle.ends_at,
+        eligible: prevCycle.eligible_count,
+        submitted: prevSubmitted,
+        participation_percent: prevParticipation,
+        total_pool: Math.round(prevPool * 100) / 100,
+        winner_name: prevCycle.winner_name || null,
+      };
     }
 
-    const cycle = cyclesRes.Items[0];
+    if (!activeCycle) {
+      return ok({ active: false, previous_cycle });
+    }
 
-    // Count submissions
-    const subsRes = await ddb.send(new QueryCommand({
-      TableName: TABLE,
-      IndexName: 'GSI1',
-      KeyConditionExpression: 'GSI1PK = :pk',
-      ExpressionAttributeValues: { ':pk': `CYCLE#${cycle.id}#SUBMISSIONS` },
-      Select: 'COUNT',
-    }));
-    const submitted = subsRes.Count || 0;
-    const eligible = cycle.eligible_count;
+    const submitted = await getCycleSubmissionCount(activeCycle.id);
+    const eligible = activeCycle.eligible_count;
     const participation = eligible > 0 ? submitted / eligible : 0;
+    const totalPool = await getCyclePool(activeCycle.id);
 
-    // Get all weekly pool records for the cycle
-    const weeksRes = await ddb.send(new QueryCommand({
-      TableName: TABLE,
-      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
-      ExpressionAttributeValues: {
-        ':pk': `CYCLE#${cycle.id}`,
-        ':sk': 'WEEK#',
-      },
-    }));
-    const totalPool = (weeksRes.Items || []).reduce((sum, w) => sum + (w.pool_amount || 0), 0);
-
-    // Deadline: 9 PM ET Friday (2 AM UTC Saturday)
+    // Next Friday 9 PM ET deadline (UTC+1:30 Sat = 02:30 UTC in EST, 01:30 in EDT)
     const now = new Date();
     const deadlineUTC = new Date(now);
     deadlineUTC.setUTCHours(2, 0, 0, 0);
-    // Move to next Saturday if needed
     const day = deadlineUTC.getUTCDay();
     if (day !== 6) {
       deadlineUTC.setUTCDate(deadlineUTC.getUTCDate() + ((6 - day + 7) % 7));
@@ -61,10 +87,10 @@ exports.handler = async () => {
     return ok({
       active: true,
       cycle: {
-        id: cycle.id,
-        name: cycle.name,
-        starts_at: cycle.starts_at,
-        ends_at: cycle.ends_at,
+        id: activeCycle.id,
+        name: activeCycle.name,
+        starts_at: activeCycle.starts_at,
+        ends_at: activeCycle.ends_at,
       },
       eligible,
       submitted,
@@ -72,6 +98,7 @@ exports.handler = async () => {
       current_weekly_pool: weeklyPool(eligible, submitted),
       total_pool: Math.round(totalPool * 100) / 100,
       deadline_utc: deadlineUTC.toISOString(),
+      previous_cycle,
     });
   } catch (e) {
     console.error(e);
