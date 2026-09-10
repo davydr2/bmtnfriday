@@ -100,6 +100,21 @@ exports.handler = async (event) => {
             ConditionExpression: 'attribute_not_exists(PK)',
           },
         },
+        // +1 token for submitting
+        {
+          Put: {
+            TableName: TABLE,
+            Item: {
+              PK: `EMPLOYEE#${employeeId}`,
+              SK: `TOKEN#${now}#submit`,
+              cycle_id: cycleId,
+              employee_id: employeeId,
+              amount: 1,
+              reason: 'submit_report',
+              created_at: now,
+            },
+          },
+        },
         // Audit log
         {
           Put: {

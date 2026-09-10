@@ -172,6 +172,22 @@ Resources:
             Path: /cycles
             Method: POST
 
+  GetWinnerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/cycles/
+      Handler: winner.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref Table
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /cycles/{id}/winner
+            Method: GET
+
   GetCycleFunction:
     Type: AWS::Serverless::Function
     Properties:

@@ -10,6 +10,9 @@ export default function Admin() {
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
   const [tab, setTab] = useState('cycles')
+  const [winnerResult, setWinnerResult] = useState(null)
+  const [winnerLoading, setWinnerLoading] = useState(false)
+  const [winnerCycleId, setWinnerCycleId] = useState(null)
 
   async function load() {
     try {
@@ -54,13 +57,13 @@ export default function Admin() {
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
 
       <div className="flex gap-2 mb-6">
-        {['cycles', 'submissions', 'new-cycle'].map(t => (
+        {['cycles', 'submissions', 'winner', 'new-cycle'].map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-1.5 rounded-full text-sm font-medium cursor-pointer ${tab === t ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
           >
-            {t === 'new-cycle' ? 'New Cycle' : t.charAt(0).toUpperCase() + t.slice(1)}
+            {t === 'new-cycle' ? 'New Cycle' : t === 'winner' ? 'Pick Winner' : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
@@ -135,6 +138,85 @@ export default function Admin() {
                   )}
                 </tbody>
               </table>
+            </>
+          )}
+        </div>
+      )}
+
+      {tab === 'winner' && (
+        <div className="max-w-xl">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-4">
+            <h2 className="font-bold text-gray-900 mb-1">Determine Winner</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Select a cycle and calculate the winner from the token pool. Only run this at cycle end.
+            </p>
+            <div className="flex gap-3">
+              <select
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                value={winnerCycleId || ''}
+                onChange={e => { setWinnerCycleId(e.target.value); setWinnerResult(null) }}
+              >
+                <option value="">Select a cycle…</option>
+                {cycles.map(c => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.status})</option>
+                ))}
+              </select>
+              <button
+                disabled={!winnerCycleId || winnerLoading}
+                onClick={async () => {
+                  setWinnerLoading(true)
+                  setWinnerResult(null)
+                  try {
+                    const res = await api.get(`/cycles/${winnerCycleId}/winner`)
+                    setWinnerResult(res)
+                  } catch (e) {
+                    alert(e.message)
+                  } finally {
+                    setWinnerLoading(false)
+                  }
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white font-semibold px-5 py-2 rounded-lg cursor-pointer"
+              >
+                {winnerLoading ? 'Calculating…' : 'Calculate'}
+              </button>
+            </div>
+          </div>
+
+          {winnerResult && (
+            <>
+              <div className="bg-green-50 border-2 border-green-400 rounded-xl p-6 mb-4 text-center">
+                <p className="text-sm text-green-600 font-medium mb-1">Winner</p>
+                <p className="text-3xl font-bold text-green-700">{winnerResult.winner.display_name}</p>
+                <p className="text-green-600 text-sm mt-1">{winnerResult.winner.tokens} tokens · slot {winnerResult.winning_slot} of {winnerResult.total_tokens}</p>
+                <p className="text-xs text-gray-400 mt-2">Secret number: {winnerResult.secret_number}</p>
+              </div>
+
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 text-sm font-semibold text-gray-600">
+                  Token pool — alphabetical order
+                </div>
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="text-left px-4 py-2 font-semibold text-gray-600">Employee</th>
+                      <th className="text-right px-4 py-2 font-semibold text-gray-600">Tokens</th>
+                      <th className="text-right px-4 py-2 font-semibold text-gray-600">Slots</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {winnerResult.pool_summary.map((e, i) => (
+                      <tr key={i} className={`border-b border-gray-100 last:border-0 ${e.display_name === winnerResult.winner.display_name ? 'bg-green-50' : ''}`}>
+                        <td className="px-4 py-2 font-medium text-gray-900">
+                          {e.display_name === winnerResult.winner.display_name && '🏆 '}
+                          {e.display_name}
+                        </td>
+                        <td className="px-4 py-2 text-right text-gray-700">{e.tokens}</td>
+                        <td className="px-4 py-2 text-right font-mono text-xs text-gray-500">{e.slots}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </>
           )}
         </div>

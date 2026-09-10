@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { getCurrentUser, signInWithRedirect, signOut, fetchAuthSession } from 'aws-amplify/auth';
+import { getCurrentUser, signIn, signOut, confirmSignIn, fetchAuthSession } from 'aws-amplify/auth';
 import { Hub } from 'aws-amplify/utils';
 
 const AuthContext = createContext(null);
@@ -31,14 +31,14 @@ export function AuthProvider({ children }) {
     return unsub;
   }, []);
 
-  const login = () => signInWithRedirect();
   const logout = () => signOut();
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, logout, loadUser }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
+export { signIn, confirmSignIn };
 export const useAuth = () => useContext(AuthContext);

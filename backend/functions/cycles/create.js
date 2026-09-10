@@ -14,8 +14,9 @@ exports.handler = async (event) => {
     const count = parseInt(eligible_count, 10);
     if (count < 1) return err(400, 'eligible_count must be >= 1');
 
-    // Secretly pick the winning position — never exposed to employees
-    const secret_winning_position = Math.floor(Math.random() * count) + 1;
+    // Secret number used to traverse the token pool at cycle end.
+    // Range 1001–9999 so it always wraps the pool multiple times.
+    const secret_winning_position = Math.floor(Math.random() * 8999) + 1001;
 
     const id = ulid();
     const now = new Date().toISOString();
