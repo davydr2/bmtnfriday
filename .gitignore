@@ -7,3 +7,4 @@ samconfig.toml
 *.zip
 __pycache__/
 .DS_Store
+CLAUDE.md
