@@ -15,8 +15,8 @@
         "dynamodb:DescribeTable"
       ],
       "Resource": [
-        "arn:aws:dynamodb:us-east-1:*:table/bmtnfriday",
-        "arn:aws:dynamodb:us-east-1:*:table/bmtnfriday/index/*"
+        "arn:aws:dynamodb:us-east-1:481652369848:table/bmtnfriday",
+        "arn:aws:dynamodb:us-east-1:481652369848:table/bmtnfriday/index/*"
       ]
     },
     {
@@ -39,9 +39,10 @@
       "Action": [
         "cloudfront:CreateInvalidation",
         "cloudfront:GetInvalidation",
-        "cloudfront:GetDistribution"
+        "cloudfront:GetDistribution",
+        "cloudfront:UpdateDistribution"
       ],
-      "Resource": "*"
+      "Resource": "arn:aws:cloudfront::481652369848:distribution/E2GGMKMBQ7V9TW"
     },
     {
       "Sid": "Lambda",
@@ -51,9 +52,25 @@
         "lambda:GetFunction",
         "lambda:UpdateFunctionCode",
         "lambda:UpdateFunctionConfiguration",
-        "lambda:ListFunctions"
+        "lambda:PublishLayerVersion",
+        "lambda:GetLayerVersion"
       ],
-      "Resource": "arn:aws:lambda:us-east-1:*:function:bmtnfriday-*"
+      "Resource": [
+        "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-ClaimNagFunction-euQ8WoUtRevz",
+        "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-CreateCycleFunction-wGFPZ2d0v7Nm",
+        "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-GetCycleFunction-1j0rVPeZYZpW",
+        "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-GetCyclesFunction-ygCNyt31WvDe",
+        "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-GetEmployeesFunction-EkjgdG6CzzYj",
+        "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-GetSubmissionsFunction-MoYT4Z3R0heV",
+        "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-GetWinnerFunction-QWEQofc9SREN",
+        "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-NagStatusFunction-iNi7d7mFOaeR",
+        "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-NagWindowFunction-eXhk2MehmxPH",
+        "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-PortalStatusFunction-VT0KJI4xh2kY",
+        "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-SubmitReportFunction-fKflM8ERYtuc",
+        "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-UpsertEmployeeFunction-IdqFDC64cYhs",
+        "arn:aws:lambda:us-east-1:481652369848:function:bmtnfriday-WeeklyPoolFunction-6JVW3yPWlrxp",
+        "arn:aws:lambda:us-east-1:481652369848:layer:bmtnfriday-deps:*"
+      ]
     },
     {
       "Sid": "CloudFormation",
@@ -64,29 +81,28 @@
         "cloudformation:DescribeStacks",
         "cloudformation:DescribeStackEvents",
         "cloudformation:DescribeStackResources",
+        "cloudformation:ListStackResources",
         "cloudformation:GetTemplate",
-        "cloudformation:ValidateTemplate",
-        "cloudformation:ListStackResources"
+        "cloudformation:ValidateTemplate"
       ],
-      "Resource": "arn:aws:cloudformation:us-east-1:*:stack/bmtnfriday*/*"
+      "Resource": "arn:aws:cloudformation:us-east-1:481652369848:stack/bmtnfriday/*"
     },
     {
-      "Sid": "SAMDeploy",
+      "Sid": "SAMBucket",
       "Effect": "Allow",
       "Action": [
         "s3:GetObject",
         "s3:PutObject",
         "s3:ListBucket",
-        "s3:CreateBucket",
         "s3:GetBucketLocation"
       ],
       "Resource": [
-        "arn:aws:s3:::aws-sam-cli-managed-default*",
-        "arn:aws:s3:::aws-sam-cli-managed-default*/*"
+        "arn:aws:s3:::aws-sam-cli-managed-default-samclisourcebucket-wueq4jy8ryn7",
+        "arn:aws:s3:::aws-sam-cli-managed-default-samclisourcebucket-wueq4jy8ryn7/*"
       ]
     },
     {
-      "Sid": "CloudWatch",
+      "Sid": "CloudWatchLogs",
       "Effect": "Allow",
       "Action": [
         "logs:CreateLogGroup",
@@ -97,7 +113,7 @@
         "logs:GetLogEvents",
         "logs:FilterLogEvents"
       ],
-      "Resource": "arn:aws:logs:us-east-1:*:log-group:/aws/lambda/bmtnfriday-*"
+      "Resource": "arn:aws:logs:us-east-1:481652369848:log-group:/aws/lambda/bmtnfriday-*"
     },
     {
       "Sid": "APIGateway",
@@ -109,7 +125,7 @@
         "apigateway:DELETE",
         "apigateway:PATCH"
       ],
-      "Resource": "arn:aws:apigateway:us-east-1::*"
+      "Resource": "arn:aws:apigateway:us-east-1::/restapis/5dxx2v6wl8/*"
     },
     {
       "Sid": "EventBridge",
@@ -121,45 +137,47 @@
         "events:DeleteRule",
         "events:DescribeRule"
       ],
-      "Resource": "arn:aws:events:us-east-1:*:rule/bmtnfriday-*"
+      "Resource": [
+        "arn:aws:events:us-east-1:481652369848:rule/bmtnfriday-NagWindowFunction*",
+        "arn:aws:events:us-east-1:481652369848:rule/bmtnfriday-WeeklyPoolFunction*"
+      ]
     },
     {
       "Sid": "Cognito",
       "Effect": "Allow",
       "Action": [
-        "cognito-idp:CreateUserPool",
-        "cognito-idp:DeleteUserPool",
-        "cognito-idp:UpdateUserPool",
-        "cognito-idp:DescribeUserPool",
-        "cognito-idp:CreateUserPoolClient",
-        "cognito-idp:DeleteUserPoolClient",
-        "cognito-idp:UpdateUserPoolClient",
-        "cognito-idp:DescribeUserPoolClient",
-        "cognito-idp:CreateUserPoolDomain",
-        "cognito-idp:DeleteUserPoolDomain",
-        "cognito-idp:CreateIdentityProvider",
-        "cognito-idp:DeleteIdentityProvider",
-        "cognito-idp:UpdateIdentityProvider",
-        "cognito-idp:CreateGroup",
-        "cognito-idp:DeleteGroup",
         "cognito-idp:AdminCreateUser",
         "cognito-idp:AdminDeleteUser",
         "cognito-idp:AdminGetUser",
+        "cognito-idp:AdminSetUserPassword",
         "cognito-idp:AdminAddUserToGroup",
         "cognito-idp:AdminRemoveUserFromGroup",
         "cognito-idp:AdminUpdateUserAttributes",
         "cognito-idp:ListUsers",
-        "cognito-idp:ListGroups",
         "cognito-idp:ListUsersInGroup",
-        "cognito-idp:GetGroup"
+        "cognito-idp:DescribeUserPool",
+        "cognito-idp:DescribeUserPoolClient",
+        "cognito-idp:CreateIdentityProvider",
+        "cognito-idp:UpdateIdentityProvider",
+        "cognito-idp:DeleteIdentityProvider"
       ],
-      "Resource": "arn:aws:cognito-idp:us-east-1:*:userpool/*"
+      "Resource": "arn:aws:cognito-idp:us-east-1:481652369848:userpool/us-east-1_4w5JjWPx8"
+    },
+    {
+      "Sid": "ACM",
+      "Effect": "Allow",
+      "Action": [
+        "acm:DescribeCertificate",
+        "acm:GetCertificate",
+        "acm:ListCertificates"
+      ],
+      "Resource": "arn:aws:acm:us-east-1:481652369848:certificate/e76d4172-8b94-43c8-9671-d97f1477191f"
     },
     {
       "Sid": "IAMPassRole",
       "Effect": "Allow",
       "Action": "iam:PassRole",
-      "Resource": "arn:aws:iam::*:role/bmtnfriday-*"
+      "Resource": "arn:aws:iam::481652369848:role/bmtnfriday-*"
     }
   ]
 }
