@@ -15,10 +15,18 @@ Globals:
       - !Ref DepsLayer
 
 Parameters:
-  CognitoUserPoolId:
+  # Microsoft Entra ID (Azure AD) — from your Azure App Registration
+  MicrosoftClientId:
     Type: String
-  CognitoClientId:
+    Description: Azure App Registration client ID
+  MicrosoftClientSecret:
     Type: String
+    NoEcho: true
+    Description: Azure App Registration client secret
+  MicrosoftTenantId:
+    Type: String
+    Description: Azure AD tenant ID (your VSO tenant)
+  # Slack (Phase 2 — leave blank for now)
   SlackBotToken:
     Type: String
     Default: ''
@@ -27,6 +35,78 @@ Parameters:
     Default: ''
 
 Resources:
+
+  # ── Cognito — Microsoft Entra ID federation ───────────────────────────────
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: bmtnfriday
+      AutoVerifiedAttributes: [email]
+      UsernameAttributes: [email]
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+        - Name: employee_id
+          AttributeDataType: String
+          Mutable: true
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true  # employees must be provisioned by admin
+      UserPoolTags:
+        Project: bmtnfriday
+
+  MicrosoftIdP:
+    Type: AWS::Cognito::UserPoolIdentityProvider
+    Properties:
+      UserPoolId: !Ref UserPool
+      ProviderName: Microsoft
+      ProviderType: OIDC
+      ProviderDetails:
+        client_id: !Ref MicrosoftClientId
+        client_secret: !Ref MicrosoftClientSecret
+        attributes_request_method: GET
+        oidc_issuer: !Sub 'https://login.microsoftonline.com/${MicrosoftTenantId}/v2.0'
+        authorize_scopes: 'openid email profile'
+      AttributeMapping:
+        email: email
+        name: name
+        username: sub
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: bmtnfriday-auth
+      UserPoolId: !Ref UserPool
+
+  AdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: admin
+      UserPoolId: !Ref UserPool
+      Description: Portal administrators
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: MicrosoftIdP
+    Properties:
+      ClientName: bmtnfriday-web
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email, profile]
+      AllowedOAuthFlowsUserPoolClient: true
+      SupportedIdentityProviders:
+        - Microsoft
+      CallbackURLs:
+        - https://bmtnfriday.com/
+        - http://localhost:5173/
+      LogoutURLs:
+        - https://bmtnfriday.com/
+        - http://localhost:5173/
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
 
   # ── DynamoDB ──────────────────────────────────────────────────────────────
   Table:
@@ -84,7 +164,7 @@ Resources:
         DefaultAuthorizer: CognitoAuth
         Authorizers:
           CognitoAuth:
-            UserPoolArn: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}'
+            UserPoolArn: !GetAtt UserPool.Arn
 
   # ── Lambda functions ──────────────────────────────────────────────────────
 
@@ -359,3 +439,9 @@ Outputs:
     Value: !Ref WebBucket
   CloudFrontDistributionId:
     Value: !Ref CloudFrontDistribution
+  CognitoUserPoolId:
+    Value: !Ref UserPool
+  CognitoClientId:
+    Value: !Ref UserPoolClient
+  CognitoDomain:
+    Value: !Sub 'bmtnfriday-auth.auth.${AWS::Region}.amazoncognito.com'
